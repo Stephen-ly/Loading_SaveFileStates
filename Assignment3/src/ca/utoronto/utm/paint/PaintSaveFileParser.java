@@ -270,7 +270,7 @@ public class PaintSaveFileParser {
 								String[] removingP2 = l.split(":");
 								String removeBrackets = removingP2[1].replaceAll("[\\()]","");
 								String [] removeComma = removeBrackets.split(",");
-								rectangle.setP1(new Point(Integer.parseInt(removeComma[0]),Integer.parseInt(removeComma[1])));
+								rectangle.setP2(new Point(Integer.parseInt(removeComma[0]),Integer.parseInt(removeComma[1])));
 								state=6;
 								break;
 							}
