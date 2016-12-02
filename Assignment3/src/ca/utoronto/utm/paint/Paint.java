@@ -97,8 +97,8 @@ public class Paint extends JFrame implements ActionListener {
 				}
 				PaintSaveFileParser parser = new PaintSaveFileParser();
 				parser.parse(reader);
-				
-				
+				this.paintPanel.setCommands(parser.getCommands());
+				this.paintPanel.repaint();
 			} else {
 				System.out.println("Open command cancelled by user." + "\n");
 			}

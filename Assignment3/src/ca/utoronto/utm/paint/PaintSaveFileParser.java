@@ -23,6 +23,9 @@ public class PaintSaveFileParser {
 	private String errorMessage =""; // error encountered during parse
 	private ArrayList<PaintCommand> commands; // created as a result of the parse
 	private String shape = null;
+	private static final String CIRCLE = "Circle";
+	private static final String RECTANGLE = "Rectangle";
+	private static final String SQUIGGLE = "Squiggle";
 	/**
 	 * Below are Patterns used in parsing 
 	 */
@@ -46,7 +49,10 @@ public class PaintSaveFileParser {
 
 	private Pattern pCenter= Pattern.compile("^center:\\(\\d+,\\d+\\)$");
 	private Pattern pRadius= Pattern.compile("^radius:\\d+$");
-
+	
+	private Pattern pPointStart= Pattern.compile("^points$");
+	private Pattern pPoint= Pattern.compile("^point:\\(\\d+,\\d+\\)$");
+	private Pattern pPointEnd= Pattern.compile("^endpoints$");
 	/*//Unfortunately this is needed as the order of RECTANGLE p1, and RECTANGLE p2 may be reversed, which is something 
 	 * that needs to be detected. Although they are very similar, they must use different patterns
 	 * because of this.
@@ -128,21 +134,21 @@ public class PaintSaveFileParser {
 					if(m.matches()){
 						state=2; 
 						circle = new Circle();
-						this.shape = "Circle";
+						this.shape = CIRCLE;
 						break;
 					}else{
 						m=pRectangleStart.matcher(l);
 						if (m.matches()){
 							state=2;
 							rectangle = new Rectangle();
-							this.shape = "Rectangle";
+							this.shape = RECTANGLE;
 							break;
 						}else{
 							m=pSquiggleStart.matcher(l);
 							if (m.matches()){
 								state=2;
 								squiggle = new Squiggle();
-								this.shape = "Squiggle";
+								this.shape = SQUIGGLE;
 								break;
 
 							}else{
@@ -158,75 +164,53 @@ public class PaintSaveFileParser {
 							}
 						}
 					}
-					//TODO Add the state for the Squiggle case where you want to start adding points for the Squiggle line
-
 				case 2:
+					m=pColor.matcher(l);			
+					if(m.matches()){
+						String[] removingColorWord = l.split(":");
+						String[] splitIntoValues = removingColorWord[1].split(",");
+						state=3;
 
-
-					if (this.shape == "Circle"){
-
-						m=pColor.matcher(l);			
-						if(m.matches()){
-							String[] removingColorWord = l.split(":");
-							String[] splitIntoValues = removingColorWord[1].split(",");
+						if (this.shape == CIRCLE){
 							circle.setColor(new Color(Integer.parseInt(splitIntoValues[0]),Integer.parseInt(splitIntoValues[1]),
-									Integer.parseInt(splitIntoValues[2])));
-							state=3;
+									Integer.parseInt(splitIntoValues[2])));	
 							break;
-						}
-						else{
-							error("The Color String is expected");
-							return false;
-						}
-					}else if(this.shape == "Rectangle"){
-
-						m=pColor.matcher(l);
-						if(m.matches()){
-							String[] removingColorWord = l.split(":");
-							String[] splitIntoValues = removingColorWord[1].split(",");
+						}else if(this.shape == RECTANGLE){
 							rectangle.setColor(new Color(Integer.parseInt(splitIntoValues[0]),Integer.parseInt(splitIntoValues[1]),
 									Integer.parseInt(splitIntoValues[2])));
-							state=3;
+							break;
+						}else if(this.shape == SQUIGGLE){
+							squiggle.setColor(new Color(Integer.parseInt(splitIntoValues[0]),Integer.parseInt(splitIntoValues[1]),
+									Integer.parseInt(splitIntoValues[2])));
 							break;
 						}
-						else{
-							error("The Color String is expected");
-							return false;
-						}
+					}else{
+						error("The Color String is expected");
+						return false;
 					}
 
 				case 3:
-					if (this.shape == "Circle"){
-						m = pIsFilled.matcher(l);
-						if(m.matches()){
-							String[] removingFilledWord = l.split(":");
+					m = pIsFilled.matcher(l);
+					if(m.matches()){
+						String[] removingFilledWord = l.split(":");
+						state=4;
+						if (this.shape == CIRCLE){
 							circle.setFill(Boolean.valueOf(removingFilledWord[1]));
-							state=4;
 							break;
-						}
-						else{
-							error("The is fill string is expected");
-							return false;
-						}
-
-					}else if (this.shape == "Rectangle"){
-						m = pIsFilled.matcher(l);
-						if(m.matches()){
-							String[] removingFilledWord = l.split(":");
+						}else if (this.shape == RECTANGLE){
 							rectangle.setFill(Boolean.valueOf(removingFilledWord[1]));
-							state=4;
+							break;
+						}else if (this.shape == SQUIGGLE){
+							squiggle.setFill(Boolean.valueOf(removingFilledWord[1]));
 							break;
 						}
-						else{
-							error("The is fill string is expected");
-							return false;
-						}
-
+					}else{
+						error("The is fill string is expected");
+						return false;
 					}
 
 				case 4:
-					if (this.shape == "Circle"){
-
+					if (this.shape == CIRCLE){
 						m = pCenter.matcher(l);
 						if(m.matches()){
 							String[] removingCenterWord = l.split(":");
@@ -240,7 +224,8 @@ public class PaintSaveFileParser {
 							error("The centre string is expected");
 							return false;
 						}
-					} else if (this.shape == "Rectangle"){
+
+					} else if (this.shape == RECTANGLE){
 						m = pRectanglePoint1.matcher(l);
 						if(m.matches()){
 							String[] removingP1 = l.split(":");
@@ -255,75 +240,119 @@ public class PaintSaveFileParser {
 							return false;
 						}
 
+					}else if (this.shape == SQUIGGLE){
+						m = pPointStart.matcher(l);
+						if(m.matches()){
+							state=5;
+							break;
+						}
+						else{
+							error("The point start string is expected");
+							return false;
+						}
 					}
-				case 5:
-					if (this.shape == "Circle"){
-						m = pRadius.matcher(l);
-						if(m.matches()){
-							String[] removingRadiusWord = l.split(":");
-							circle.setRadius(Integer.parseInt(removingRadiusWord[1]));
-							state=6;
-							break;
+					case 5:
+						if (this.shape == CIRCLE){
+							m = pRadius.matcher(l);
+							if(m.matches()){
+								String[] removingRadiusWord = l.split(":");
+								circle.setRadius(Integer.parseInt(removingRadiusWord[1]));
+								state=6;
+								break;
+							}
+							else{
+								error("The radius string is expected");
+								return false;
+							}
+						} else if(this.shape == RECTANGLE){ //remember to fix this cause you might have errors with the p1/p2 order
+							m = pRectanglePoint2.matcher(l);
+							if(m.matches()){
+								String[] removingP2 = l.split(":");
+								String removeBrackets = removingP2[1].replaceAll("[\\()]","");
+								String [] removeComma = removeBrackets.split(",");
+								rectangle.setP1(new Point(Integer.parseInt(removeComma[0]),Integer.parseInt(removeComma[1])));
+								state=6;
+								break;
+							}
+							else{
+								error("The point2 string is expected");
+								return false;
+							}
+							
+						} else if(this.shape == SQUIGGLE){
+							m = pPoint.matcher(l);
+							if(m.matches()){
+								String[] removingPoint = l.split(":");
+								String removeBrackets = removingPoint[1].replaceAll("[\\()]","");
+								String [] removeComma = removeBrackets.split(",");
+								squiggle.add(new Point(Integer.parseInt(removeComma[0]),Integer.parseInt(removeComma[1])));
+								state=5;
+								break;
+							}else{
+								m = pPointEnd.matcher(l);
+								if(m.matches()){
+									state=6;
+									break;
+								}
+								else{
+									error("The point string is expected");
+									return false;
+								}
+							}
 						}
-						else{
-							error("The radius string is expected");
-							return false;
+					case 6:
+						if (this.shape == CIRCLE){
+							m = pCircleEnd.matcher(l);
+							if(m.matches()){
+								state=1;
+								commands.add(new CircleCommand(circle));
+								this.shape = null;
+								circle = null;// this may cause some issues because of pointers with the circle command but I'm not sure at this point
+								break;
+							}
+							else{
+								//error("") changed into println for development purposes.
+								error("Expected Circle End");
+								return false;
+							}
 						}
-					} else if(this.shape == "Rectangle"){ //remember to fix this cause you might have errors with the p1/p2 order
-						m = pRectanglePoint2.matcher(l);
-						if(m.matches()){
-							String[] removingP2 = l.split(":");
-							String removeBrackets = removingP2[1].replaceAll("[\\()]","");
-							String [] removeComma = removeBrackets.split(",");
-							rectangle.setP1(new Point(Integer.parseInt(removeComma[0]),Integer.parseInt(removeComma[1])));
-							state=6;
-							break;
-						}
-						else{
-							error("The point2 string is expected");
-							return false;
+						else if (this.shape == RECTANGLE){
+							m = pRectangleEnd.matcher(l);
+							if(m.matches()){
+								state=1;
+								commands.add(new RectangleCommand(rectangle));
+								this.shape = null;
+								rectangle = null;// this may cause some issues because of pointers with the circle command but I'm not sure at this point
+								break;
+							}
+							else{
+								//error("") changed into println for development purposes.
+								error("Expected Rectangle End");;
+								return false;
+							}
 
 						}
-					}
-					break;
-				case 6:
-					if (this.shape == "Circle"){
-						m = pCircleEnd.matcher(l);
-						if(m.matches()){
-							state=1;
-							commands.add(new CircleCommand(circle));
-							this.shape = null;
-							circle = null;// this may cause some issues because of pointers with the circle command but I'm not sure at this point
-							break;
-						}
-						else{
-							//error("") changed into println for development purposes.
-							error("Expected Circle End");
-							return false;
-						}
-					}
-					else if (this.shape == "Rectangle"){
-						m = pRectangleEnd.matcher(l);
-						if(m.matches()){
-							state=1;
-							commands.add(new RectangleCommand(rectangle));
-							this.shape = null;
-							rectangle = null;// this may cause some issues because of pointers with the circle command but I'm not sure at this point
-							break;
-						}
-						else{
-							//error("") changed into println for development purposes.
-							error("Expected Rectangle End");;
-							return false;
-						}
+						else if (this.shape == SQUIGGLE){
+							m =  pSquiggleEnd.matcher(l);
+							if(m.matches()){
+								state=1;
+								commands.add(new SquiggleCommand(squiggle));
+								this.shape = null;
+								squiggle = null;
+								break;
+							}
 
+							else{
+								error("The Squiggle end is expected");
+								return false;
+							}
+						}
 					}
+
 				}
+			}  catch (Exception e){
 
-			}
-		}  catch (Exception e){
-
-		} 
-		return true;
+			} 
+			return true;
+		}
 	}
-}
